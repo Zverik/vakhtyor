@@ -15,7 +15,7 @@
 дважды: в `vakhtyor.pl` и `config.php`. Далее перловый скрипт можно добавить
 в *crontab* и запускать раз в несколько часов, например, с такими параметрами:
 
-    /home/user/vakhtyor.pl -d maindb -u user -p password -v -l http://planet.openstreetmap.org/replication/hour 2> /home/user/vakhtyor.log
+    /home/user/vakhtyor.pl -d maindb -u user -p password -v -l http://planet.openstreetmap.org/replication/hour 2>>/home/user/vakhtyor.log
 
 Из других интересных настроек в perl-файле обратите внимание на `$bbox`
 (по умолчанию он не очень большой) и `@countries`, куда записаны коды стран,

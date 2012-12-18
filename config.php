@@ -1,4 +1,4 @@
-<? // Vakhtyor (Вахтёр): web interface configuration file. Written by Ilya Zverev, licensed WTFPL.
+<? // Vakhtyor: web interface configuration file. Written by Ilya Zverev, licensed WTFPL.
 
 // OpenStreetMap OAuth parameters, see http://wiki.openstreetmap.org/wiki/OAuth
 const CLIENT_ID     = '';
@@ -18,8 +18,9 @@ const DB_TABLE    = 'v_stats';
 
 // Miscellaneous
 const OBJ_LIMIT = 20; // Minimal number of changed buildings per day to matter
-const PAGE_SIZE = 15; // Number of lines per page
+const PAGE_SIZE = 25; // Number of lines per page
 const DEFAULT_USER = ''; // If set, this user is considered logged in by default
 const LOG_FILE = 'vakhtyor.log'; // By default it's the directory of the script, anyone can see it
+const MAP_URL = 'http://openstreetmap.ru/#lat=%s&lon=%s&zoom=17'; // a link to the map
 
 ?>

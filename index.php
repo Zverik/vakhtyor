@@ -85,13 +85,48 @@ if( $action == 'comment' ) {
         if( $handle = @fopen(LOG_FILE, 'a') ) {
             $res = $db->query('select user_name, map_date from '.DB_TABLE.' where stat_id = '.$id);
             $row = $res && $res->num_rows > 0 ? $res->fetch_assoc() : array('user_name' => '???', 'map_date' => '???');
-            fwrite($handle, sprintf("%s %s правку %s от %s (№%d): %s\n", $user, $good == '0' ? 'забраковал' : ($good == '1' ? 'одобрил' : 'прокомментировал'), $row['user_name'], $row['map_date'], $id, str_replace("\n", '\n', $_POST['comment'])));
+            $time = localtime();
+            fwrite($handle, sprintf("В %02d:%02d %s %s правку %s от %s (№%d): %s\n", $time[2], $time[1], $user, $good == '0' ? 'забраковал' : ($good == '1' ? 'одобрил' : 'прокомментировал'), $row['user_name'], $row['map_date'], $id, str_replace("\n", '\n', $_POST['comment'])));
             fclose($handle);
         }
 
         header("Location: ".$php_self);
         exit;
     }
+} elseif( $action == 'rss' ) {
+    $result = $db->query("select * from ".DB_TABLE." where object_count >= ".OBJ_LIMIT." and map_date < curdate() order by stat_id desc limit 15");
+    header('Content-type: application/rss+xml; charset=utf-8');
+    $url = 'http://'.$_SERVER['HTTP_HOST'].$php_self;
+    print <<<"EOT"
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+\t<title>Вахтёр OpenStreetMap</title>
+\t<description>Лента записей системы &amp;laquo;Вахтёр&amp;raquo;</description>
+\t<link>$url</link>
+\t<ttl>360</ttl>
+
+EOT;
+$months = array('января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря', 'мартобря');
+date_default_timezone_set('UTC');
+while( $row = $result->fetch_assoc() ) {
+    print "\t<item>\n";
+    $verb = $row['good'] == 1 ? 'мапил' : 'попортил';
+    print "\t\t<title>".htmlspecialchars($row['user_name'])." $verb ".htmlspecialchars($row['location'])."</title>\n";
+    print "\t\t<link>http://www.openstreetmap.org/browse/changeset/${row['changeset']}</link>\n";
+    $date = strtotime($row['map_date']) + $row['stat_id'];
+    $date_str = date(DATE_RSS, $date);
+    print "\t\t<pubDate>$date_str</pubDate>\n";
+    $datep = localtime($date);
+    $desc = $datep[3].' '.$months[$datep[4]].' пользователь '.htmlspecialchars($row['user_name']).' <a href="http://www.openstreetmap.org/browse/changeset/'.$row['changeset'].'">нарисовал</a> '.$row['object_count'].' домиков в <a href="'.htmlspecialchars(sprintf(MAP_URL, $row['lat'], $row['lon'])).'">'.htmlspecialchars($row['location']).'</a>, где отсутствуют детальные снимки Bing.';
+    if( $row['checked_by'] ) {
+        $desc .= '<br><br>'.htmlspecialchars($row['checked_by']).' '.(is_null($row['good']) ? 'заметил' : ($row['good'] == 1 ? 'одобрил' : ($row['good'] == 0 ? 'обеспокоен' : 'сломал базу'))).': '.str_replace("\n", '<br>', htmlspecialchars($row['comment']));
+    }
+    print "\t\t<description>".htmlspecialchars($desc)."</description>\n";
+    print "\t</item>\n";
+}
+print "</channel>\n</rss>";
+exit;
 }
 
 $uid = isset($_REQUEST['uid']) ? $_REQUEST['uid'] : '';
@@ -127,6 +162,7 @@ $result = $db->query("select * from ".DB_TABLE." where object_count >= $objlimit
 <html>
 <head>
 <title>Вахтёр OpenStreetMap</title>
+<link rel="alternate" type="application/rss+xml" title="Лента RSS" href="<?=$_SERVER['PHP_SELF']?>?action=rss" />
 <style>
 * {
     font-family: Verdana, Arial, sans-serif;
@@ -192,7 +228,7 @@ function cb(cnt, value) {
 </head>
 <body>
 <h1>Вахтёр OpenStreetMap</h1>
-<p>В эту таблицу записаны случаи рисования домов в местах, где отсутствует покрытие качественными снимками Bing. Если человек загрузил несколько ченджсетов, отражены данные лишь по первому (но количество объектов суммируется). Большое количество нарисованных домов может означать импорт, рисование по памяти или &mdash; что мы и пытаемся отловить &mdash; рисование по чужим снимкам или обводку чужих карт. Пользователи OpenStreetMap могут <? if(!$user): ?><a href="<?=$php_self?>?action=login"><? endif; ?>залогиниться<? if(!$user): ?></a><? else: ?> (вы <?=$user ?>, <a href="<?=$php_self?>?action=logout">выйти</a>)<? endif; ?> и оставлять комментарии насчёт правок, равно как и определять, &laquo;хорошие&raquo; они или &laquo;плохие&raquo;. Если обнаружите нарушение наших условий участия, пишите в тему &laquo;<a href="http://forum.openstreetmap.org/viewtopic.php?id=6129" target="_blank">откаты правок</a>&raquo; или <a href="mailto:board@openstreetmap.ru">на почту Совету</a>.</p>
+<p>В эту таблицу записаны случаи рисования домов в местах, где отсутствует покрытие качественными снимками Bing. Если человек загрузил несколько ченджсетов, отражены данные лишь по первому (но количество объектов суммируется). Большое количество нарисованных домов может означать импорт, рисование по памяти или &mdash; что мы и пытаемся отловить &mdash; рисование по чужим снимкам или обводку чужих карт. Пользователи OpenStreetMap могут <? if(!$user): ?><a href="<?=$php_self?>?action=login"><? endif; ?>залогиниться<? if(!$user): ?></a><? else: ?> (вы <?=$user ?>, <a href="<?=$php_self?>?action=logout">выйти</a>)<? endif; ?> и оставлять комментарии насчёт правок, равно как и определять, &laquo;хорошие&raquo; они или &laquo;плохие&raquo;. Если обнаружите нарушение наших условий участия, напишите автору. Если ответ вас неприятно удивил, обращайтесь в тему &laquo;<a href="http://forum.openstreetmap.org/viewtopic.php?id=6129" target="_blank">откаты правок</a>&raquo; или <a href="mailto:board@openstreetmap.ru">на почту Совету</a>.</p>
 <table>
 <tr>
     <th>Дата</th>
@@ -206,7 +242,7 @@ function cb(cnt, value) {
     <td><?=$row['map_date'] ?></td>
     <td><span class="<?=in_array($row['user_id'], $users_good) ? 'ugood' : (in_array($row['user_id'], $users_bad) ? 'ubad' : '')?>"><a href="http://www.openstreetmap.org/browse/changeset/<?=rawurlencode($row['changeset']) ?>" target="_blank"><?=htmlspecialchars($row['user_name']) ?></a></span> <a href="<?=$php_self ?>?uid=<?=$row['user_id'] ?>">[Ф]</a></td>
     <td class="number"><?=$row['object_count'] ?></td>
-    <td><a href="http://openstreetmap.ru/#lat=<?=$row['lat']?>&lon=<?=$row['lon']?>&zoom=17" target="_blank"><?=htmlspecialchars($row['location']) ?></a> <a href="http://osm.sbin.ru/ov3/map#zoom=14&lat=<?=$row['lat']?>&lon=<?=$row['lon']?>" target="_blank" style="color: #bbb; font-size: 8pt;">(ov3?)</a></td>
+    <td><a href="<?=sprintf(MAP_URL, $row['lat'], $row['lon']) ?>" target="_blank"><?=htmlspecialchars($row['location']) ?></a> <a href="http://osm.sbin.ru/ov3/map#zoom=14&lat=<?=$row['lat']?>&lon=<?=$row['lon']?>" target="_blank" style="color: #bbb; font-size: 8pt;">(ov3?)</a></td>
     <td>
         <span id="c<?=$cnt?>"><? if( $row['checked_by'] ): ?>
         <?=htmlspecialchars($row['checked_by'])?> <?=is_null($row['good']) ? 'заметил' : ($row['good'] == 1 ? 'одобрил' : ($row['good'] == 0 ? 'обеспокоен' : 'сломал базу'))?>: <?=str_replace("\n", '<br>', htmlspecialchars($row['comment'])) ?>

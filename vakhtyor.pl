@@ -110,7 +110,7 @@ sub update_state {
         open FH, '-|:utf8', "$wget -q -O- $osc_url" or die "Failed to open: $!";
         process_osc(new IO::Uncompress::Gunzip(*FH));
         close FH;
-        print STDERR "OK\n" if $verbose;
+        print STDERR ' '.scalar(@buildings).'/'.scalar(keys %node_tiles)."\n" if $verbose;
 
         if( $state == $last || scalar(keys %node_tiles) > 100000 || scalar(@buildings) > 5000 ) {
             process_data();
@@ -319,15 +319,15 @@ SQL
             my $location = get_location($b->[5], $b->[6]);
             next if $location eq '-';
             $cnt++;
-            $db->query($sql, $b->[3], $b->[1], $b->[2], $b->[4], $b->[0], $b->[5], $b->[6], substr($location,0,199)) or print STDERR "\nDB error: ".$db->error."\n";
+            $db->query($sql, $b->[3], $b->[1], $b->[2], $b->[4], $b->[0], $b->[5], $b->[6], substr($location,0,199)) or die "\nDB error: ".$db->error."\n";
         }
-        print STDERR "($cnt)" if $cnt != scalar(keys %store_buildings);
+        print STDERR "($cnt)" if $cnt != scalar(keys %store_buildings) && $verbose;
         print STDERR ' and '.scalar(keys %newtiles).' bing tiles...' if $verbose;
         my $sql_t = "replace into ${dbprefix}bing (tile_id, found, check_date) values (??)";
         my @etime = localtime;
         my $today = sprintf('%04d-%02d-%02d', $etime[5]+1900, $etime[4]+1, $etime[3]);
         for (keys %newtiles) {
-            $db->query($sql_t, $_, $newtiles{$_}, $today) or print "\nError uploading a tile: ".$db->error."\n";
+            $db->query($sql_t, $_, $newtiles{$_}, $today) or print STDERR "\nError uploading a tile: ".$db->error."\n";
         }
         $db->commit;
         print STDERR " OK\n" if $verbose;
